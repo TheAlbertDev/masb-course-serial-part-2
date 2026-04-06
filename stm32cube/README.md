@@ -19,13 +19,35 @@ Let's begin! 💪🏻
 
 Our final application will follow the flow diagram below. Basically, each time the button is pressed, a packet of bytes will be encoded in COBS (in this case, a decimal value stored in a `float` variable) and, at the same time, we'll also be waiting for the reception of COBS-encoded byte packets and decode them. Let's start by preparing the project.
 
-<!-- TODO Make mermaid diagram -->
+```mermaid
+flowchart TD
+    A["Initialize variables and peripherals"] --> B["Wait for byte"]
+    B --> C{Packet received?}
+    C -- Yes --> D["Decode packet"]
+    D --> E["Packet received = FALSE"]
+    E --> F["Wait for byte"]
+    F --> C
+    C -- No --> G{Send packet?}
+    G -- Yes --> H["Format packet"]
+    H --> I["Encode packet"]
+    I --> J["Send encoded packet"]
+    J --> K["Send packet = FALSE"]
+    K --> G
+    G -- No --> C
 
-<p align="center">
-<a href="../assets/imgs/app-flow-diagram.png">
-<img src="../assets/imgs/app-flow-diagram.png" alt="Application flow diagram" />
-</a>
-</p>
+    subgraph ISR_UART ["ISR: UART Byte Reception"]
+        direction TB
+        U1["ISR: UART byte reception"] --> U2{"Received byte == Term char?"}
+        U2 -- No --> U3["Wait for byte"]
+        U2 -- Yes --> U4["Packet received = TRUE"]
+    end
+
+    subgraph ISR_BTN ["ISR: Button"]
+        direction TB
+        P1["ISR: Button"] --> P2["Send packet = TRUE"]
+    end
+
+```
 
 ### Base Project Preparation
 
@@ -194,7 +216,7 @@ Easy, one by one 😎 The thing is how to convert a `float` of four bytes into a
 Bit shifting — surprise! — means moving all the bits one position to the left or to the right. We do this with the `>>` or `<<` operators. The first one moves the bits to the right and the second one moves them to the left. The number of positions to shift is indicated right after the operator. For example, if we have `uint8_t x = 16`, its binary representation is `0b00010000`.
 
 > [!NOTE]
-> Para anotar números en base binaria, ponemos `0b` delante de ellos, igual que para poner números en hexadecimal poníamos `0x`.
+> To annotate numbers in binary, we put `0b` in front of them, just as we put `0x` in front of hexadecimal numbers.
 
 If we want to shift the bits of `x` 1 position to the right, we would do:
 
@@ -251,7 +273,7 @@ First, notice how we had to include the `string.h` library, which provides the `
 > [!NOTE]
 > You were happy with Python and you didn't know it...
 
-A modo resumen hasta ahora. Si quisiera enviar los bytes que forman `float pi = 3.141592` haríamos (me invento una función enviar por UART):
+As a summary so far. If we wanted to send the bytes that make up `float pi = 3.141592`, we would do (using a made-up UART send function):
 
 ```c
 #include <string.h>
@@ -267,13 +289,13 @@ pi_bytes[2] = (pi_raw >> 16) & 0xFF;
 pi_bytes[1] = (pi_raw >> 8) & 0xFF;
 pi_bytes[0] = pi_raw & 0xFF;
 
-enviar_por_uart(pi_bytes[0]);
-enviar_por_uart(pi_bytes[1]);
-enviar_por_uart(pi_bytes[2]);
-enviar_por_uart(pi_bytes[3]);
+uart_send(pi_bytes[0]);
+uart_send(pi_bytes[1]);
+uart_send(pi_bytes[2]);
+uart_send(pi_bytes[3]);
 ```
 
-Y aquí podriamos acabar (pero no lo haremos, evidentemente). One thing we still need to see/understand is: is byte 0 the [MSB (_Most Significant Byte_)](https://en.wikipedia.org/wiki/Most_significant_byte) or the [LSB (_Least Significant Byte_)](https://en.wikipedia.org/wiki/Least_significant_byte)? It's important to know this to later follow the convention we establish in serial communication. That convention will set whether we send the MSBs or LSBs first. We're talking about _endianness_.
+And here we could stop (but we won't, obviously). One thing we still need to see/understand is: is byte 0 the [MSB (_Most Significant Byte_)](https://en.wikipedia.org/wiki/Most_significant_byte) or the [LSB (_Least Significant Byte_)](https://en.wikipedia.org/wiki/Least_significant_byte)? It's important to know this to later follow the convention we establish in serial communication. That convention will set whether we send the MSBs or LSBs first. We're talking about _endianness_.
 
 #### _Endianness_
 
@@ -362,7 +384,7 @@ There are a couple of _defines_/macros. These macros are `UART_BUFFER_SIZE` and 
 We compile and debug. We open CoolTerm, if we didn't have it open already, and configure the connection at 115200 8N1 and connect. We press the microcontroller's button and check that we receive the expected data. How can you check it? Use _breakpoints_ and check that the steps are performed correctly by seeing the values that the _buffer_ takes before and after encoding.
 
 > [!TIP]
-> Si enviamos ese 34.52 en COBS, en CoolTerm deberíamos recibir codificado `0x05 0x7B 0x14 0x0A 0x42 0x00`.
+> If we send that 34.52 encoded in COBS, in CoolTerm we should receive `0x05 0x7B 0x14 0x0A 0x42 0x00`.
 
 ### Receiving COBS-encoded Byte Packets
 
@@ -469,7 +491,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 We compile and start the program in the microcontroller. We go to CoolTerm and send in hexadecimal a COBS-encoded message (so it can't have random bytes or contain `0x00`) and add the final _term char_ `0x00`. Use _breakpoints_ to see what has been received in the microcontroller and the decoded message.
 
 > [!TIP]
-> Si enviamos `0x05 0xF4 0xFD 0xA4 0x40 0x00` en COBS desde CoolTerm, deberíamos de recibir (una vez decodificado) `0xF4 0xFD 0xA4 0x40` o, lo que es lo mismo, 5.156.
+> If we send `0x05 0xF4 0xFD 0xA4 0x40 0x00` in COBS from CoolTerm, we should receive (once decoded) `0xF4 0xFD 0xA4 0x40`, which is equivalent to 5.156.
 
 With this last case, we've already implemented the flow diagram from the beginning of the guide 😎
 
