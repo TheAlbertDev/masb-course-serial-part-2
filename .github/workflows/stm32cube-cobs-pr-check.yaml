@@ -1,4 +1,4 @@
-name: 🧪 STM32Cube serial ASCII - PR check
+name: 🧪 STM32Cube cobs - PR check
 
 on:
   pull_request:
@@ -18,7 +18,8 @@ jobs:
     name: ✅ Build and Run Acceptance tests
     if: |
       !github.event.repository.is_template &&
-      startsWith(github.head_ref, 'stm32cube/') && endsWith(github.head_ref, '/serial-ascii')
+      startsWith(github.head_ref, 'stm32cube/') &&
+      endsWith(github.head_ref, '/serial-cobs')
     runs-on: self-hosted
     steps:
       - name: 🛡️ Get GitHub App token
@@ -34,22 +35,19 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: 🔍 Extract student username from branch name
-        run: |
-          echo "STUDENT_USERNAME=$(echo '${{ github.head_ref }}' | cut -d'/' -f2)" >> $GITHUB_ENV
-
       - name: 🏗️ Build and upload STM32Cube project
         run: |
-          cd ${{ github.workspace }}/stm32cube/workspace/${{ env.STUDENT_USERNAME }}/serial-ascii
+          USERNAME=$(echo "${{ github.head_ref }}" | cut -d'/' -f2)
+          cd ${{ github.workspace }}/stm32cube/workspace/$USERNAME/serial-cobs
           rm -rf build/Debug
           cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=./cmake/gcc-arm-none-eabi.cmake -B build/Debug
           cmake --build build/Debug
-          pio pkg exec -p tool-openocd -c "openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c 'program build/Debug/serial-ascii.elf verify reset exit'"
+          pio pkg exec -p tool-openocd -c "openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c 'program build/Debug/serial-cobs.elf verify reset exit'"
 
       - name: 🧬 Run acceptance tests
         id: acceptance-tests
         run: |
-          TEST_DIR=${{ github.workspace }}/.github/tests/acceptance/test_stm32cube_serial_ascii
+          TEST_DIR=${{ github.workspace }}/.github/tests/acceptance/test_stm32cube_serial_cobs
           CACHE_KEY=$(md5sum "$TEST_DIR/requirements.txt" | cut -d' ' -f1)
           VENV_CACHE_DIR="/opt/actions-cache/venv/$CACHE_KEY"
 

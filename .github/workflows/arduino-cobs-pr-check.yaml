@@ -1,4 +1,4 @@
-name: 🧪 Arduino serial challenge - PR check
+name: 🧪 Arduino cobs - PR check
 
 on:
   pull_request:
